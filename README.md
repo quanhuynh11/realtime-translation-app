@@ -1,3 +1,6 @@
+Required Dependency (ffmpeg): https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z
+Need to unzip and rename the folder to ffmpeg, then drag into the root project directory.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
