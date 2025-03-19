@@ -6,12 +6,20 @@ import { FaMicrophoneAlt, FaMicrophoneAltSlash } from "react-icons/fa";
 export default function TranslatePage() {
     const [isRecording, setIsRecording] = useState(false);
     const [audioURI, setAudioURI] = useState(null);
-    const [transcription, setTranscription] = useState([]);
+    const [transcription, setTranscription] = useState([
+        { text: "Hello World", translated: false },
+    ]);
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
     const streamRef = useRef(null);
 
+    const [translatedText, setTranslatedText] = useState([]);
+
     const [selectedIncomingLanguage, setSelectedIncomingLanguage] = useState("en-US");
+
+    const [selectedTranslationLanguage, setSelectedTranslationLanguage] = useState("JA");
+
+    const deeplLanguages = require("../deepl-languages.json");
 
     useEffect(() => {
         if (!navigator.mediaDevices || !window.MediaRecorder) {
@@ -64,8 +72,19 @@ export default function TranslatePage() {
     };
 
     const appendTranscription = (newData) => {
-        setTranscription((prevTranscription) => [...prevTranscription, newData]); // Add new data as a new array element
+        setTranscription((prevTranscription) => [
+            ...prevTranscription,
+            { text: newData, translated: false } // Store as an object with a translated flag
+        ]);
     };
+
+    const appendTranslation = (newData) => {
+        setTranslatedText((prevTranscription) => [
+            ...prevTranscription,
+            { text: newData, translated: true } // Store as an object with a translated flag
+        ]);
+    };
+
 
     const uploadAudio = async (audioBlob) => {
 
@@ -110,7 +129,28 @@ export default function TranslatePage() {
         catch (error) {
             console.error("Error sending audio:", error);
         }
+
+        // let translationText = transcription.filter((item) => item.translated === false).map((item) => item.text).join(" ");
+
+        let translationText = "Hello World";
+
+        try {
+            const response = await fetch(`/api/deepl-translate?text=${translationText}&targetLanguage=${selectedTranslationLanguage}`, {
+                method: "POST",
+                body: transcription,
+            })
+
+            if (response.ok) {
+                const data = await response.json();
+
+                appendTranslation(data.text);
+            }
+        }
+        catch (error) {
+            console.error("Error sending audio:", error);
+        }
     };
+
 
     return (
         <section className="w-screen h-screen bg-slate-900 p-5 text-center text-white overflow-auto">
@@ -149,6 +189,16 @@ export default function TranslatePage() {
                 </select>
             </section>
 
+            <section>
+                <p>To</p>
+            </section>
+
+            <section>
+                <select value={selectedTranslationLanguage} onChange={(e) => selectedTranslationLanguage(e.target.value)} className="bg-slate-900 w-1/6 h-10 text-center border-white border rounded-lg">
+
+                </select>
+            </section>
+
             {/* {audioURI && (
                 <div className="flex flex-col items-center">
                     <h3>Recorded Audio</h3>
@@ -160,13 +210,25 @@ export default function TranslatePage() {
                 </div>
             )} */}
 
-            <button onClick={() => setTranscription([])} className="bg-red-600 text-white py-2 px-4 rounded-lg text-2xl hover:cursor-pointer hover:bg-red-800">Clear Transcription</button>
+            <button onClick={() => { setTranscription([]); setTranslatedText([]); }} className="bg-red-600 text-white py-2 px-4 rounded-lg text-2xl hover:cursor-pointer hover:bg-red-800">Clear Transcription</button>
             {transcription && (
                 <div className="mt-5 p-4 bg-gray-800 rounded-md h-3/4">
                     <h3 className="text-lg font-semibold">Transcription:</h3>
-                    {transcription.map((item, index) => (
-                        <p key={index}>{item}</p>
-                    ))}
+                    <section className="flex justify-around items-center">
+                        <section>
+                            {transcription.map((item, index) => (
+                                <p className="text-2xl" key={index}>{item.text}</p>
+                            ))}
+                        </section>
+                            <section>
+                                <p className="">Translates To:</p>
+                            </section>
+                        <section>
+                            {translatedText.map((item, index) => (
+                                <p className="text-2xl" key={index}>{item.text}</p>
+                            ))}
+                        </section>
+                    </section>
                 </div>
             )}
 

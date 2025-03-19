@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google-cloud/speech": "^7.0.0",
+    "deepl-node": "^1.17.3",
     "fluent-ffmpeg": "^2.1.3",
     "next": "15.2.3",
     "react": "^19.0.0",
