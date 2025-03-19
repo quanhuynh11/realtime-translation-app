@@ -4,15 +4,44 @@ import { useState, useEffect, useRef } from "react";
 import { FaMicrophoneAlt, FaMicrophoneAltSlash } from "react-icons/fa";
 
 export default function TranslatePage() {
+
+    // Keep track of the recording status 
     const [isRecording, setIsRecording] = useState(false);
+
+    // Keep track of the audio URI
     const [audioURI, setAudioURI] = useState(null);
-    const [transcription, setTranscription] = useState([]);
+
+    // Keep track of the transcription, which is an array of objects with text and translated flags
+    const [transcription, setTranscription] = useState([
+        { text: "Hello World", translated: false },
+    ]);
+
+    // mediaRecorderRef and audioChunksRef are used to record audio
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
+
+    // streamRef is used to store the audio stream
     const streamRef = useRef(null);
 
+    // Keep track of the translated text
+    const [translatedText, setTranslatedText] = useState([]);
+
+    // Keep track of the selected language for speech-to-text
     const [selectedIncomingLanguage, setSelectedIncomingLanguage] = useState("en-US");
 
+    // Keep track of the selected translation language
+    const [selectedTranslationLanguage, setSelectedTranslationLanguage] = useState("JA");
+
+    // deeplLanguages is the list of languages supported by DeepL
+    const deeplLanguages = require("../deepl-languages.json");
+
+    const googleLanguages = require("../google-languages.json");
+    
+    /**
+     * Start recording audio,
+     * stop recording audio,
+     * and send the recorded audio to the backend for transcription and translation.
+     */
     useEffect(() => {
         if (!navigator.mediaDevices || !window.MediaRecorder) {
             alert("Your browser does not support audio recording.");
@@ -49,7 +78,7 @@ export default function TranslatePage() {
                 mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
             }
         };
-    }, [selectedIncomingLanguage]);
+    }, [selectedIncomingLanguage, selectedTranslationLanguage, transcription]);
 
     const toggleRecording = () => {
         // setTranscription(null); // Clear previous transcriptions
@@ -64,8 +93,26 @@ export default function TranslatePage() {
     };
 
     const appendTranscription = (newData) => {
-        setTranscription((prevTranscription) => [...prevTranscription, newData]); // Add new data as a new array element
+        setTranscription((prevTranscription) => [
+            ...prevTranscription,
+            { text: newData, translated: false } // Store as an object with a translated flag
+        ]);
     };
+
+    const appendTranslation = (newData, unTranslatedText) => {
+
+        setTranscription((prevTranscription) => {
+            return prevTranscription.map((entry) =>
+                entry.text === unTranslatedText ? { ...entry, translated: true } : entry
+            );
+        });        
+
+        setTranslatedText((prevTranscription) => [
+            ...prevTranscription,
+            { text: newData, translated: true } // Store as an object with a translated flag
+        ]);
+    };
+
 
     const uploadAudio = async (audioBlob) => {
 
@@ -110,7 +157,34 @@ export default function TranslatePage() {
         catch (error) {
             console.error("Error sending audio:", error);
         }
+
+        let translationText = transcription.filter((item) => item.translated === false).map((item) => item.text).join(" ");
+
+        // console.log(translationText);
+        // let translationText = "Hello World";
+
+        try {
+
+            if(!translationText) {
+                return;
+            }
+
+            const response = await fetch(`/api/deepl-translate?text=${translationText}&targetLanguage=${selectedTranslationLanguage}`, {
+                method: "POST",
+                body: transcription,
+            })
+
+            if (response.ok) {
+                const data = await response.json();
+
+                appendTranslation(data.text, translationText);
+            }
+        }
+        catch (error) {
+            console.error("Error sending audio:", error);
+        }
     };
+
 
     return (
         <section className="w-screen h-screen bg-slate-900 p-5 text-center text-white overflow-auto">
@@ -128,7 +202,7 @@ export default function TranslatePage() {
                 <p className="text-2xl">Listening...</p>
             )}
 
-            <section className="mb-5">
+            {/* <section className="mb-5">
                 <select value={selectedIncomingLanguage} onChange={(e) => setSelectedIncomingLanguage(e.target.value)} className="bg-slate-900 w-1/6 h-10 text-center border-white border rounded-lg">
                     <option value="en-US">English</option>
                     <option value="es-ES">Spanish</option>
@@ -147,6 +221,26 @@ export default function TranslatePage() {
                     <option value="te-IN">Telugu</option>
                     <option value="ur-PK">Urdu</option>
                 </select>
+            </section> */}
+
+            <section className="mb-5">
+                <select value={selectedIncomingLanguage} onChange={(e) => setSelectedIncomingLanguage(e.target.value)} className="bg-slate-900 w-1/6 h-10 text-center border-white border rounded-lg">
+                    {googleLanguages.languages.map((item, index) => (
+                        <option key={index} value={item.code}>{item.name}</option>
+                    ))}
+                </select>
+            </section>
+
+            <section className="my-5">
+                <p>To</p>
+            </section>
+
+            <section className="mb-10">
+                <select value={selectedTranslationLanguage} onChange={(e) => setSelectedTranslationLanguage(e.target.value)} className="bg-slate-900 w-1/6 h-10 text-center border-white border rounded-lg">
+                    {deeplLanguages.languages.map((item, index) => (
+                        <option key={index} value={item.code}>{item.name}</option>
+                    ))}
+                </select>
             </section>
 
             {/* {audioURI && (
@@ -160,13 +254,25 @@ export default function TranslatePage() {
                 </div>
             )} */}
 
-            <button onClick={() => setTranscription([])} className="bg-red-600 text-white py-2 px-4 rounded-lg text-2xl hover:cursor-pointer hover:bg-red-800">Clear Transcription</button>
+            <button onClick={() => { setTranscription([]); setTranslatedText([]); }} className="bg-red-600 text-white py-2 px-4 rounded-lg text-2xl hover:cursor-pointer hover:bg-red-800">Clear Transcription</button>
             {transcription && (
                 <div className="mt-5 p-4 bg-gray-800 rounded-md h-3/4">
                     <h3 className="text-lg font-semibold">Transcription:</h3>
-                    {transcription.map((item, index) => (
-                        <p key={index}>{item}</p>
-                    ))}
+                    <section className="flex justify-around items-center">
+                        <section>
+                            {transcription.map((item, index) => (
+                                <p className="text-2xl" key={index}>{item.text}</p>
+                            ))}
+                        </section>
+                            <section>
+                                <p className="">Translates To:</p>
+                            </section>
+                        <section>
+                            {translatedText.map((item, index) => (
+                                <p className="text-2xl" key={index}>{item.text}</p>
+                            ))}
+                        </section>
+                    </section>
                 </div>
             )}
 
