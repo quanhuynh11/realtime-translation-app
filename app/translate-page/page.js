@@ -65,11 +65,10 @@ export default function TranslatePage() {
 
     const uploadAudio = async (audioBlob) => {
 
+        let filePath;
+
         const fileExtension = audioBlob.type.split("/")[1]; // Extract extension from MIME type (e.g., "wav")
         let newFilename = `${Math.floor(Math.random() * 10000)}_audio.${fileExtension}`;
-
-        setCurrentAudio(newFilename);
-        console.log(newFilename);
 
         const formData = new FormData();
         formData.append("file", audioBlob);
@@ -83,26 +82,29 @@ export default function TranslatePage() {
             if (!response.ok) {
                 throw new Error(`Failed to upload file: ${response.statusText}`);
             }
+
+            const data = await response.json();
+            filePath = data.filePath;
+
         } catch (error) {
             console.error(error);
         }
 
+        try {
+            const response = await fetch(`/api/speech-to-text?filename=${filePath}&encoding=LINEAR16&sampleRateHertz=16000&languageCode=en-US`, {
+                method: "POST",
+            });
 
-        // try {
-        //     const response = await fetch("/api/speech-to-text?voiceURI=" + audioURI + "&languageCode=en-US", {
-        //         method: "POST",
-        //     });
-
-        //     if (response.ok) {
-        //         const data = await response.json();
-        //         setTranscription(data.transcript);
-        //     } else {
-        //         console.error("Failed to transcribe audio");
-        //     }
-        // }
-        // catch (error) {
-        //     console.error("Error sending audio:", error);
-        // }
+            if (response.ok) {
+                const data = await response.json();
+                setTranscription(data);
+            } else {
+                console.error("Failed to transcribe audio");
+            }
+        }
+        catch (error) {
+            console.error("Error sending audio:", error);
+        }
     };
 
     return (

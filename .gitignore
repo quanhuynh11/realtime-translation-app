@@ -43,3 +43,5 @@ next-env.d.ts
 google-key.json
 
 /public/uploads
+/ffmpeg
+/temp
