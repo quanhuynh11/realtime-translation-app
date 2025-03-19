@@ -12,9 +12,7 @@ export default function TranslatePage() {
     const [audioURI, setAudioURI] = useState(null);
 
     // Keep track of the transcription, which is an array of objects with text and translated flags
-    const [transcription, setTranscription] = useState([
-        { text: "Hello World", translated: false },
-    ]);
+    const [transcription, setTranscription] = useState([]);
 
     // mediaRecorderRef and audioChunksRef are used to record audio
     const mediaRecorderRef = useRef(null);
@@ -36,7 +34,7 @@ export default function TranslatePage() {
     const deeplLanguages = require("../deepl-languages.json");
 
     const googleLanguages = require("../google-languages.json");
-    
+
     /**
      * Start recording audio,
      * stop recording audio,
@@ -78,7 +76,14 @@ export default function TranslatePage() {
                 mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
             }
         };
-    }, [selectedIncomingLanguage, selectedTranslationLanguage, transcription]);
+    }, [selectedIncomingLanguage, selectedTranslationLanguage]);
+
+    useEffect(() => {
+        if (transcription.length > 0) {
+            handleTranslation(transcription);
+        }
+    }, [transcription]);
+    
 
     const toggleRecording = () => {
         // setTranscription(null); // Clear previous transcriptions
@@ -92,20 +97,25 @@ export default function TranslatePage() {
         setIsRecording((prev) => !prev);
     };
 
-    const appendTranscription = (newData) => {
+    const appendTranscription = async (newData) => {
+
+        if(newData === "" || newData === undefined) return;
+
         setTranscription((prevTranscription) => [
             ...prevTranscription,
-            { text: newData, translated: false } // Store as an object with a translated flag
+            { text: newData, translated: false }
         ]);
     };
+    
 
-    const appendTranslation = (newData, unTranslatedText) => {
+
+    const appendTranslation = async (newData, unTranslatedText) => {
 
         setTranscription((prevTranscription) => {
             return prevTranscription.map((entry) =>
                 entry.text === unTranslatedText ? { ...entry, translated: true } : entry
             );
-        });        
+        });
 
         setTranslatedText((prevTranscription) => [
             ...prevTranscription,
@@ -148,7 +158,7 @@ export default function TranslatePage() {
 
             if (response.ok) {
                 const data = await response.json();
-                appendTranscription(data);
+                await appendTranscription(data);
 
             } else {
                 console.error("Failed to transcribe audio");
@@ -157,33 +167,31 @@ export default function TranslatePage() {
         catch (error) {
             console.error("Error sending audio:", error);
         }
+    };
 
-        let translationText = transcription.filter((item) => item.translated === false).map((item) => item.text).join(" ");
-
-        // console.log(translationText);
-        // let translationText = "Hello World";
-
+    const handleTranslation = async (updatedTranscription) => {
+        let translationText = updatedTranscription
+            .filter((item) => item.translated === false)
+            .map((item) => item.text)
+            .join(" ");
+    
+        if (!translationText) return;
+    
         try {
-
-            if(!translationText) {
-                return;
-            }
-
             const response = await fetch(`/api/deepl-translate?text=${translationText}&targetLanguage=${selectedTranslationLanguage}`, {
                 method: "POST",
-                body: transcription,
-            })
-
+                body: JSON.stringify(updatedTranscription),
+            });
+    
             if (response.ok) {
                 const data = await response.json();
-
-                appendTranslation(data.text, translationText);
+                await appendTranslation(data.text, translationText);
             }
-        }
-        catch (error) {
-            console.error("Error sending audio:", error);
+        } catch (error) {
+            console.error("Error translating audio:", error);
         }
     };
+    
 
 
     return (
@@ -201,27 +209,6 @@ export default function TranslatePage() {
             {isRecording && (
                 <p className="text-2xl">Listening...</p>
             )}
-
-            {/* <section className="mb-5">
-                <select value={selectedIncomingLanguage} onChange={(e) => setSelectedIncomingLanguage(e.target.value)} className="bg-slate-900 w-1/6 h-10 text-center border-white border rounded-lg">
-                    <option value="en-US">English</option>
-                    <option value="es-ES">Spanish</option>
-                    <option value="fr-FR">French</option>
-                    <option value="de-DE">German</option>
-                    <option value="it-IT">Italian</option>
-                    <option value="pt-BR">Portuguese</option>
-                    <option value="ru-RU">Russian</option>
-                    <option value="zh-CN">Chinese</option>
-                    <option value="ja-JP">Japanese</option>
-                    <option value="ko-KR">Korean</option>
-                    <option value="ar-AR">Arabic</option>
-                    <option value="hi-IN">Hindi</option>
-                    <option value="bn-BD">Bengali</option>
-                    <option value="ta-IN">Tamil</option>
-                    <option value="te-IN">Telugu</option>
-                    <option value="ur-PK">Urdu</option>
-                </select>
-            </section> */}
 
             <section className="mb-5">
                 <select value={selectedIncomingLanguage} onChange={(e) => setSelectedIncomingLanguage(e.target.value)} className="bg-slate-900 w-1/6 h-10 text-center border-white border rounded-lg">
@@ -264,9 +251,9 @@ export default function TranslatePage() {
                                 <p className="text-2xl" key={index}>{item.text}</p>
                             ))}
                         </section>
-                            <section>
-                                <p className="">Translates To:</p>
-                            </section>
+                        <section>
+                            <p className="">Translates To:</p>
+                        </section>
                         <section>
                             {translatedText.map((item, index) => (
                                 <p className="text-2xl" key={index}>{item.text}</p>

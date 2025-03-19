@@ -1,16 +1,26 @@
 import { SpeechClient } from '@google-cloud/speech';
 import path from 'path';
-import process from 'process';
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 
-// Set credentials before initializing SpeechClient
+// Resolve the path to the credentials file
 const credentialsPath = path.resolve('./config/google-key.json');
-if (fs.existsSync(credentialsPath)) {
-    process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
-}
 
-const client = new SpeechClient();
+let client;
+
+if (fs.existsSync(credentialsPath)) {
+    // Read the JSON credentials file
+    const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+
+    // Initialize SpeechClient with the parsed credentials
+    client = new SpeechClient({
+        credentials: credentials
+    });
+
+    console.log('Google Cloud Speech-to-Text client initialized successfully');
+} else {
+    console.error('Credentials file not found');
+}
 
 export async function POST(req) {
     const { searchParams } = new URL(req.url);
